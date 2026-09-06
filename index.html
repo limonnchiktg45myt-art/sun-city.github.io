@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sun-City · Homicide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #1a0e00; /* резервный цвет, если картинки не загрузятся */
+        }
+
+        .loader-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            /* Фон будет задаваться через JS */
+            background-size: cover;
+            background-position: center;
+            transition: background-image 1.5s ease-in-out;
+        }
+
+        /* Затемнение для читаемости текста */
+        .loader-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .cityscape {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40%;
+            pointer-events: none;
+            z-index: 2;
+            opacity: 0.6;
+        }
+
+        .cityscape svg {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            fill: #1a0e00;
+            opacity: 0.7;
+        }
+
+        .header {
+            position: relative;
+            z-index: 3;
+            text-align: center;
+            margin-bottom: 30px;
+            animation: fadeInDown 1.2s ease-out;
+        }
+
+        .sun-icon {
+            font-size: 90px;
+            display: block;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 30px #ffd700) drop-shadow(0 0 60px #ff8c00);
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        .server-name {
+            font-size: 80px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            color: #fff7d6;
+            text-shadow: 
+                0 0 20px #ffd700,
+                0 0 40px #ffb300,
+                0 0 80px #ff8c00,
+                0 4px 8px rgba(0,0,0,0.6);
+            animation: textGlow 2s infinite alternate;
+        }
+
+        .subtitle {
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 6px;
+            color: #ffecb3;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            margin-top: -10px;
+            background: rgba(0,0,0,0.2);
+            display: inline-block;
+            padding: 8px 30px;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .info-panel {
+            position: relative;
+            z-index: 3;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            border-radius: 20px;
+            padding: 30px 50px;
+            margin-bottom: 30px;
+            color: #fff8e7;
+            display: flex;
+            gap: 60px;
+            flex-wrap: wrap;
+            justify-content: center;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+            animation: fadeInUp 1.2s ease-out;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-item .label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .info-item .value {
+            font-size: 26px;
+            font-weight: 700;
+            color: #ffd966;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .progress-container {
+            position: relative;
+            z-index: 3;
+            width: 70%;
+            max-width: 700px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50px;
+            padding: 6px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            margin-bottom: 20px;
+            animation: fadeInUp 1.4s ease-out;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 24px;
+            background: linear-gradient(90deg, #ffd700, #ffb300, #ff8c00);
+            border-radius: 50px;
+            box-shadow: 0 0 30px #ffd700, inset 0 2px 4px rgba(255,255,200,0.6);
+            transition: width 0.15s ease-out;
+            position: relative;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 6px;
+            right: 6px;
+            height: 8px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.5), transparent);
+            border-radius: 40px;
+            opacity: 0.6;
+        }
+
+        .progress-text {
+            position: relative;
+            z-index: 3;
+            color: #fff7d6;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            margin-top: 8px;
+            min-height: 32px;
+        }
+
+        .progress-text span {
+            color: #ffd966;
+        }
+
+        /* ===== Музыкальный плеер (правый верхний угол) ===== */
+        .music-player {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .music-control {
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,215,0,0.4);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #ffd700;
+            font-size: 32px;
+            box-shadow: 0 0 20px rgba(255,215,0,0.2);
+        }
+
+        .music-control:hover {
+            transform: scale(1.1);
+            background: rgba(255,215,0,0.2);
+            border-color: #ffd700;
+            box-shadow: 0 0 40px rgba(255,215,0,0.4);
+        }
+
+        .music-control.muted {
+            opacity: 0.5;
+        }
+
+        .music-control.muted:hover {
+            opacity: 0.8;
+        }
+
+        .music-info {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 16px;
+            padding: 12px 18px;
+            min-width: 200px;
+            max-width: 280px;
+            text-align: right;
+            color: #fff7d6;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            transition: opacity 0.3s;
+        }
+
+        .music-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffd966;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .music-time {
+            font-size: 14px;
+            opacity: 0.8;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .music-time .current {
+            color: #ffd700;
+        }
+        .music-time .separator {
+            opacity: 0.4;
+        }
+        .music-time .remaining {
+            color: #ffb347;
+        }
+
+        .music-status {
+            font-size: 12px;
+            opacity: 0.6;
+            margin-top: 2px;
+        }
+
+        /* ===== Авторская надпись внизу ===== */
+        .footer-credit {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 5;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #ffd966;
+            text-shadow: 
+                0 0 20px rgba(255, 215, 0, 0.4),
+                0 4px 12px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(2px);
+            padding: 8px 0;
+            border-top: 1px solid rgba(255,215,0,0.15);
+            border-bottom: 1px solid rgba(255,215,0,0.15);
+            animation: fadeInUp 2s ease-out;
+            pointer-events: none;
+        }
+
+        .footer-credit span {
+            color: #ffb300;
+            font-weight: 900;
+        }
+
+        /* ===== Анимации ===== */
+        @keyframes fadeInDown {
+            0% { opacity: 0; transform: translateY(-40px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(40px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulseGlow {
+            0% { filter: drop-shadow(0 0 20px #ffd700) drop-shadow(0 0 40px #ff8c00); transform: scale(1); }
+            100% { filter: drop-shadow(0 0 40px #ffb300) drop-shadow(0 0 80px #ff6600); transform: scale(1.05); }
+        }
+
+        @keyframes textGlow {
+            0% { text-shadow: 0 0 20px #ffd700, 0 0 40px #ffb300, 0 0 80px #ff8c00, 0 4px 8px rgba(0,0,0,0.6); }
+            100% { text-shadow: 0 0 30px #ffb300, 0 0 60px #ff8c00, 0 0 120px #ff6600, 0 4px 12px rgba(0,0,0,0.8); }
+        }
+
+        /* ===== Адаптив ===== */
+        @media (max-width: 768px) {
+            .server-name { font-size: 44px; letter-spacing: 4px; }
+            .sun-icon { font-size: 60px; }
+            .subtitle { font-size: 18px; padding: 6px 20px; }
+            .info-panel { padding: 20px 30px; gap: 30px; flex-direction: column; }
+            .info-item .value { font-size: 22px; }
+            .progress-container { width: 90%; }
+            .cityscape { height: 30%; }
+            .music-control { width: 48px; height: 48px; font-size: 24px; }
+            .music-player { top: 20px; right: 20px; }
+            .music-info { min-width: 160px; padding: 10px 14px; }
+            .music-title { font-size: 14px; }
+            .music-time { font-size: 12px; }
+            .footer-credit { font-size: 18px; padding: 6px 0; bottom: 15px; }
+        }
+
+        @media (max-width: 480px) {
+            .server-name { font-size: 32px; }
+            .sun-icon { font-size: 48px; }
+            .subtitle { font-size: 14px; }
+            .info-panel { padding: 15px 20px; gap: 15px; }
+            .info-item .value { font-size: 18px; }
+            .progress-text { font-size: 16px; }
+            .music-control { width: 40px; height: 40px; font-size: 20px; }
+            .music-player { top: 15px; right: 15px; }
+            .music-info { min-width: 140px; padding: 8px 12px; }
+            .music-title { font-size: 12px; }
+            .music-time { font-size: 11px; }
+            .footer-credit { font-size: 14px; padding: 4px 0; bottom: 10px; letter-spacing: 2px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="loader-wrapper" id="bgWrapper">
+
+    <!-- Городской силуэт -->
+    <div class="cityscape">
+        <svg viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid meet">
+            <!-- (полный SVG код города, тот же, что был) -->
+            <rect x="0" y="300" width="80" height="100" />
+            <rect x="90" y="200" width="60" height="200" />
+            <rect x="100" y="140" width="40" height="60" />
+            <rect x="160" y="240" width="100" height="160" />
+            <rect x="180" y="180" width="60" height="60" />
+            <rect x="270" y="160" width="70" height="240" />
+            <rect x="280" y="100" width="40" height="60" />
+            <rect x="350" y="280" width="120" height="120" />
+            <rect x="370" y="220" width="80" height="60" />
+            <rect x="480" y="120" width="90" height="280" />
+            <rect x="500" y="60" width="40" height="60" />
+            <rect x="580" y="200" width="80" height="200" />
+            <rect x="600" y="140" width="40" height="60" />
+            <rect x="670" y="260" width="100" height="140" />
+            <rect x="690" y="200" width="60" height="60" />
+            <rect x="780" y="180" width="70" height="220" />
+            <rect x="800" y="120" width="30" height="60" />
+            <rect x="860" y="300" width="110" height="100" />
+            <rect x="880" y="240" width="70" height="60" />
+            <rect x="980" y="140" width="80" height="260" />
+            <rect x="1000" y="80" width="40" height="60" />
+            <rect x="1070" y="220" width="130" height="180" />
+            <rect x="1090" y="160" width="90" height="60" />
+            <!-- Окна -->
+            <rect x="110" y="210" width="10" height="10" fill="#ffd700" opacity="0.5" />
+            <rect x="130" y="210" width="10" height="10" fill="#ffd700" opacity="0.5" />
+            <rect x="200" y="250" width="12" height="12" fill="#ffd700" opacity="0.4" />
+            <rect x="220" y="250" width="12" height="12" fill="#ffd700" opacity="0.4" />
+            <rect x="290" y="170" width="10" height="10" fill="#ffd700" opacity="0.6" />
+            <rect x="310" y="170" width="10" height="10" fill="#ffd700" opacity="0.6" />
+            <rect x="390" y="290" width="14" height="14" fill="#ffd700" opacity="0.3" />
+            <rect x="410" y="290" width="14" height="14" fill="#ffd700" opacity="0.3" />
+            <rect x="500" y="130" width="12" height="12" fill="#ffd700" opacity="0.5" />
+            <rect x="520" y="130" width="12" height="12" fill="#ffd700" opacity="0.5" />
+            <rect x="610" y="210" width="10" height="10" fill="#ffd700" opacity="0.4" />
+            <rect x="630" y="210" width="10" height="10" fill="#ffd700" opacity="0.4" />
+            <rect x="710" y="270" width="14" height="14" fill="#ffd700" opacity="0.5" />
+            <rect x="730" y="270" width="14" height="14" fill="#ffd700" opacity="0.5" />
+            <rect x="810" y="190" width="10" height="10" fill="#ffd700" opacity="0.6" />
+            <rect x="830" y="190" width="10" height="10" fill="#ffd700" opacity="0.6" />
+            <rect x="1000" y="150" width="12" height="12" fill="#ffd700" opacity="0.4" />
+            <rect x="1020" y="150" width="12" height="12" fill="#ffd700" opacity="0.4" />
+            <rect x="1100" y="230" width="14" height="14" fill="#ffd700" opacity="0.5" />
+            <rect x="1120" y="230" width="14" height="14" fill="#ffd700" opacity="0.5" />
+        </svg>
+    </div>
+
+    <!-- Логотип -->
+    <div class="header">
+        <span class="sun-icon">☀️</span>
+        <div class="server-name">Sun-City</div>
+        <div class="subtitle">Z-City · Homicide</div>
+    </div>
+
+    <!-- Информационная панель -->
+    <div class="info-panel">
+        <div class="info-item">
+            <div class="label">🌐 IP-адрес</div>
+            <div class="value">85.17.xxx.xx:27015</div>
+        </div>
+        <div class="info-item">
+            <div class="label">👥 Игроки</div>
+            <div class="value"><span id="playerCount">0</span> / 32</div>
+        </div>
+        <div class="info-item">
+            <div class="label">📅 Карта</div>
+            <div class="value">zcity_homicide</div>
+        </div>
+    </div>
+
+    <!-- Полоса загрузки -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">Загрузка <span id="percentDisplay">0</span>%</div>
+
+    <!-- Музыкальный плеер -->
+    <div class="music-player">
+        <div class="music-control" id="musicToggle" title="Включить/выключить музыку">
+            <span id="musicIcon">🔊</span>
+        </div>
+        <div class="music-info" id="musicInfo">
+            <div class="music-title" id="musicTitle">Городской эмбиент</div>
+            <div class="music-time">
+                <span class="current" id="currentTime">00:00</span>
+                <span class="separator">/</span>
+                <span class="remaining" id="remainingTime">00:00</span>
+            </div>
+            <div class="music-status" id="musicStatus">♫ играет</div>
+        </div>
+    </div>
+
+    <!-- Авторская надпись -->
+    <div class="footer-credit">BY <span>TV46MUT</span></div>
+
+    <!-- Аудио -->
+    <audio id="bgMusic" loop preload="auto">
+        <source src="https://cdn.pixabay.com/download/audio/2022/10/25/audio_b8a0f3e3c4.mp3?filename=urban-city-ambient-18666.mp3" type="audio/mpeg">
+        Ваш браузер не поддерживает аудио.
+    </audio>
+
+</div>
+
+<script>
+    (function() {
+        // =========================================
+        // === НАСТРОЙКА ФОНОВЫХ ИЗОБРАЖЕНИЙ ===
+        // =========================================
+        // ★ Впишите сюда имена своих файлов (в папке backgrounds/)
+        // Пример: "bg1.jpg", "bg2.png", "bg3.webp"
+        const BACKGROUNDS = [
+            "bg1.jpg",
+            "bg2.jpg",
+            "bg3.jpg"
+            // Добавляйте свои картинки сюда
+        ];
+
+        // Путь к папке с картинками (относительно этого HTML-файла)
+        const BG_PATH = "backgrounds/";
+
+        // Интервал смены фона (в миллисекундах)
+        const BG_INTERVAL = 10000; // 10 секунд
+
+        // =========================================
+        // === КОД ПЕРЕКЛЮЧЕНИЯ ФОНА ===
+        // =========================================
+        const bgWrapper = document.getElementById('bgWrapper');
+        let currentIndex = 0;
+
+        function setBackground(index) {
+            if (!BACKGROUNDS.length) return;
+            const imgUrl = BG_PATH + BACKGROUNDS[index % BACKGROUNDS.length];
+            bgWrapper.style.backgroundImage = `url('${imgUrl}')`;
+        }
+
+        function nextBackground() {
+            if (!BACKGROUNDS.length) return;
+            currentIndex = (currentIndex + 1) % BACKGROUNDS.length;
+            setBackground(currentIndex);
+        }
+
+        // Загружаем первый фон сразу
+        if (BACKGROUNDS.length) {
+            setBackground(0);
+            // Запускаем таймер смены
+            setInterval(nextBackground, BG_INTERVAL);
+        } else {
+            // Если массив пуст, ставим запасной цвет
+            bgWrapper.style.backgroundColor = '#2d1f00';
+        }
+
+        // =========================================
+        // === ОСТАЛЬНОЙ КОД (музыка, загрузка и т.д.) ===
+        // =========================================
+        const progressBar = document.getElementById('progressBar');
+        const percentDisplay = document.getElementById('percentDisplay');
+        const progressText = document.getElementById('progressText');
+        const playerCountSpan = document.getElementById('playerCount');
+
+        // Музыка
+        const audio = document.getElementById('bgMusic');
+        const musicToggle = document.getElementById('musicToggle');
+        const musicIcon = document.getElementById('musicIcon');
+        const musicTitle = document.getElementById('musicTitle');
+        const currentTimeEl = document.getElementById('currentTime');
+        const remainingTimeEl = document.getElementById('remainingTime');
+        const musicStatus = document.getElementById('musicStatus');
+
+        const TRACK_NAME = 'Urban City Ambient';
+        musicTitle.textContent = TRACK_NAME;
+
+        audio.volume = 0.3;
+
+        function formatTime(seconds) {
+            if (isNaN(seconds) || !isFinite(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function updateTimeDisplay() {
+            if (!audio.duration || isNaN(audio.duration)) {
+                currentTimeEl.textContent = '00:00';
+                remainingTimeEl.textContent = '00:00';
+                return;
+            }
+            const current = audio.currentTime;
+            const duration = audio.duration;
+            const remaining = duration - current;
+            currentTimeEl.textContent = formatTime(current);
+            remainingTimeEl.textContent = formatTime(remaining);
+        }
+
+        function updateStatus() {
+            if (audio.paused) {
+                musicStatus.textContent = '⏸ пауза';
+            } else {
+                musicStatus.textContent = '♫ играет';
+            }
+        }
+
+        function updateMusicState() {
+            if (audio.paused) {
+                musicIcon.textContent = '🔇';
+                musicToggle.classList.add('muted');
+            } else {
+                musicIcon.textContent = '🔊';
+                musicToggle.classList.remove('muted');
+            }
+            updateStatus();
+        }
+
+        musicToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (audio.paused) {
+                audio.play().then(() => {
+                    updateMusicState();
+                }).catch(() => {});
+            } else {
+                audio.pause();
+                updateMusicState();
+            }
+        });
+
+        audio.addEventListener('loadedmetadata', function() {
+            updateTimeDisplay();
+            if (!audio.paused) {
+                updateMusicState();
+            }
+        });
+
+        audio.addEventListener('play', function() {
+            updateMusicState();
+            if (window._timeInterval) clearInterval(window._timeInterval);
+            window._timeInterval = setInterval(updateTimeDisplay, 1000);
+        });
+
+        audio.addEventListener('pause', function() {
+            updateMusicState();
+        });
+
+        audio.addEventListener('timeupdate', function() {
+            updateTimeDisplay();
+        });
+
+        audio.addEventListener('ended', function() {
+            updateMusicState();
+        });
+
+        audio.addEventListener('error', function() {
+            musicIcon.textContent = '⚠️';
+            musicToggle.title = 'Ошибка загрузки музыки';
+            musicStatus.textContent = '❌ трек недоступен';
+            currentTimeEl.textContent = '--:--';
+            remainingTimeEl.textContent = '--:--';
+        });
+
+        audio.play().catch(() => {
+            updateMusicState();
+        });
+
+        setTimeout(updateTimeDisplay, 200);
+
+        // Прогресс загрузки
+        let progress = 0;
+        const step = 0.5;
+        const intervalTime = 60;
+
+        function updateProgress() {
+            if (progress < 100) {
+                const increment = step + (Math.random() * 0.6 - 0.3);
+                progress = Math.min(progress + increment, 100);
+                const percent = Math.floor(progress);
+                progressBar.style.width = progress + '%';
+                percentDisplay.textContent = percent;
+
+                if (percent < 20) {
+                    progressText.innerHTML = '🔄 Подключение к <span>Sun-City</span>...';
+                } else if (percent < 40) {
+                    progressText.innerHTML = '📦 Загрузка карты <span>zcity_homicide</span>...';
+                } else if (percent < 70) {
+                    progressText.innerHTML = '⚙️ Инициализация ресурсов сервера...';
+                } else if (percent < 90) {
+                    progressText.innerHTML = '🌆 Подготовка города...';
+                } else {
+                    progressText.innerHTML = '☀️ Добро пожаловать в <span>Sun-City</span>!';
+                }
+
+                if (percent % 5 === 0) {
+                    const fakePlayers = Math.floor(Math.random() * 20) + 5;
+                    playerCountSpan.textContent = fakePlayers;
+                }
+
+                setTimeout(updateProgress, intervalTime + Math.random() * 30);
+            } else {
+                progressBar.style.width = '100%';
+                percentDisplay.textContent = '100';
+                progressText.innerHTML = '✅ Готово! Приятной игры!';
+                playerCountSpan.textContent = '24';
+                bgWrapper.style.transition = 'filter 0.8s';
+                bgWrapper.style.filter = 'brightness(1.1)';
+            }
+        }
+
+        setTimeout(updateProgress, 500);
+
+        setInterval(() => {
+            if (parseInt(percentDisplay.textContent) >= 100) {
+                const current = parseInt(playerCountSpan.textContent) || 0;
+                const delta = Math.floor(Math.random() * 5) - 2;
+                let newVal = Math.min(32, Math.max(0, current + delta));
+                if (newVal < 0) newVal = 0;
+                playerCountSpan.textContent = newVal;
+            }
+        }, 4000);
+    })();
+</script>
+
+</body>
+</html>
